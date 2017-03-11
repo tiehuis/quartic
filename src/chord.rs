@@ -28,6 +28,21 @@ pub enum NoteClass {
     A, B, C, D, E, F, G
 }
 
+impl NoteClass {
+    pub fn from_char(input: char) -> Option<NoteClass> {
+        match input {
+            'A' => Some(NoteClass::A),
+            'B' => Some(NoteClass::B),
+            'C' => Some(NoteClass::C),
+            'D' => Some(NoteClass::D),
+            'E' => Some(NoteClass::E),
+            'F' => Some(NoteClass::F),
+            'G' => Some(NoteClass::G),
+            _   => None
+        }
+    }
+}
+
 /// Relative pitch compared to some base note as part of a chord.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PitchClass {
@@ -86,6 +101,7 @@ impl PitchClass {
 pub type PitchOffset = i8;
 
 /// A single note which may have applied accidentals.
+#[derive(Debug, PartialEq)]
 pub struct Note {
     /// The base note
     pub root: NoteClass,
