@@ -142,6 +142,17 @@ impl ChordStructure {
         ChordStructure(classes)
     }
 
+    /// Construct a `ChordStructure` from a single component.
+    ///
+    /// This is provided to simplify merging alterations into a core chord and
+    /// may be removed at some point.
+    pub fn from_component(component: ChordComponent) -> ChordStructure {
+        let mut classes = [None; PITCH_CLASS_COUNT];
+        classes[component.0.index()] = Some(component.1);
+
+        ChordStructure(classes)
+    }
+
     /// Insert a single `ChordComponent` into this `ChordStructure`.
     ///
     /// This will overwrite any existing component if the interval was already
