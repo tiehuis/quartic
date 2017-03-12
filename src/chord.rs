@@ -155,9 +155,20 @@ impl ChordStructure {
     ///
     /// This will overwrite any existing components for each of the intervals
     /// which are already present in the input slice.
-    pub fn insert_many(mut self, components: &[ChordComponent]) -> ChordStructure{
+    pub fn insert_many(mut self, components: &[ChordComponent]) -> ChordStructure {
         for &component in components {
             self.0[component.0.index()] = Some(component.1);
+        }
+        self
+    }
+
+    /// Merge two `ChordStructure`'s together with preference for elements
+    /// within the `other` structure.
+    pub fn merge(mut self, other: &ChordStructure) -> ChordStructure {
+        for i in 0..PITCH_CLASS_COUNT {
+            if other.0[i].is_some() {
+                self.0[i] = other.0[i];
+            }
         }
         self
     }

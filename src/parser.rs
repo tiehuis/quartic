@@ -3,10 +3,13 @@
 // TODO: Needs to be determined how we want to handle errors here. Likely start
 // by just re-exporting those from `combine`.
 
+#![allow(dead_code)]
+
 use chord::*;
 
 use combine::{Stream, ParseResult, Parser};
-use combine::{parser, many, one_of, optional, token};
+use combine::{choice, parser, many, one_of, optional, token, try};
+use combine::char::{string};
 
 fn note<I>(input: I) -> ParseResult<Note, I>
     where I: Stream<Item=char>
@@ -42,13 +45,43 @@ fn chord<I>(input: I) -> ParseResult<Chord, I>
                         None => (PitchClass::N3, 0)
                     });
 
-    (root, third)
-        .map(|(root, third)| {
+    let seventh = optional(choice([string("Maj")]))
+                    .map(|q| match q {
+                        Some("Maj") => (PitchClass::N7, 1),
+                        _ => (PitchClass::N7, 0)
+                    });
+
+    let interval = choice([
+                        try(string("7")), try(string("9")),
+                        try(string("11")), try(string("13"))
+                    ])
+                    .map(|q| match q {
+                        "7"  => PitchClass::N7,
+                        "9"  => PitchClass::N9,
+                        "11" => PitchClass::N11,
+                        "13" => PitchClass::N13,
+                        _ => unreachable!()
+                    }.extended_intervals());
+
+    let extended = optional(seventh.and(interval))
+                    .map(|q| match q {
+                        Some((q, i)) => {
+                            ChordStructure::new()
+                                .insert_many(i)
+                                .insert(q)
+                        }
+
+                        None => ChordStructure::new()
+                    });
+
+    (root, third, extended)
+        .map(|(root, third, extended)| {
             Chord::new(
                 root,
                 ChordStructure::new()
                     .insert(third)
                     .insert((PitchClass::N5, 0))
+                    .merge(&extended)
             )
         })
         .parse_stream(input)
@@ -117,9 +150,45 @@ mod tests {
     fn parse_minor_chord() {
         let result = parser(chord).parse("A#m");
         let expected = Chord::new(
-            Note::new(NoteClass::A, 1),
+            Note::new(A, 1),
             ChordStructure::new()
                 .insert_many(&[(N3, -1), (N5, 0)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_seventh_chord() {
+        let result = parser(chord).parse("A#Maj9");
+        let expected = Chord::new(
+            Note::new(A, 1),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0), (N7, 1), (N9, 0)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_minor_seventh_chord() {
+        let result = parser(chord).parse("Cm7");
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, 0), (N7, 0)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_dom_seventh_chord() {
+        let result = parser(chord).parse("E13");
+        let expected = Chord::new(
+            Note::new(E, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0), (N7, 0), (N9, 0), (N11, 0), (N13, 0)])
         );
 
         assert_eq!(result, Ok((expected, "")));
