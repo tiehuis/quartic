@@ -30,14 +30,16 @@ pub enum NoteClass {
 
 impl NoteClass {
     pub fn from_char(input: char) -> Option<NoteClass> {
+        use self::NoteClass::*;
+
         match input {
-            'A' => Some(NoteClass::A),
-            'B' => Some(NoteClass::B),
-            'C' => Some(NoteClass::C),
-            'D' => Some(NoteClass::D),
-            'E' => Some(NoteClass::E),
-            'F' => Some(NoteClass::F),
-            'G' => Some(NoteClass::G),
+            'A' => Some(A),
+            'B' => Some(B),
+            'C' => Some(C),
+            'D' => Some(D),
+            'E' => Some(E),
+            'F' => Some(F),
+            'G' => Some(G),
             _   => None
         }
     }
