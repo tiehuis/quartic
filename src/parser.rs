@@ -193,4 +193,16 @@ mod tests {
 
         assert_eq!(result, Ok((expected, "")));
     }
+
+    #[test]
+    fn parse_minor_major_seventh() {
+        let result = parser(chord).parse("CmMaj7");
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, 0), (N7, 1)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
 }
