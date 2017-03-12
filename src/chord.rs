@@ -164,6 +164,7 @@ impl ChordStructure {
 /// A single simple chord comprised of many notes.
 ///
 /// The chord representation used internally is based on tertian harmony.
+#[derive(Debug, PartialEq)]
 pub struct Chord {
     /// The base note
     pub root: Note,
