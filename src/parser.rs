@@ -11,6 +11,15 @@ use combine::{Stream, ParseResult, Parser};
 use combine::{between, choice, parser, many, one_of, optional, token, try, chainl1};
 use combine::char::{string, spaces};
 
+/// Parses a root note plus its accidentals.
+///
+/// An example of a note is `A#bb`. Note that accidentals are reduced as much
+/// as they can be **without** changing the base note given.
+///
+/// ```text
+/// Note : [A-G][b#]*
+///      ;
+/// ```
 fn note<I>(input: I) -> ParseResult<Note, I>
     where I: Stream<Item=char>
 {
@@ -36,11 +45,29 @@ fn note<I>(input: I) -> ParseResult<Note, I>
         .parse_stream(input)
 }
 
-fn chord<I>(input: I) -> ParseResult<Chord, I>
+/// Parses a standard chord using the default rules.
+///
+/// This will recognize standard chords based on a third/seventh interval with
+/// a possible extended interval present.
+///
+/// An example of a chord this parser reconizes is `F#mMaj7`.
+///
+/// ```text
+/// ThirdQuality : 'm'
+///              ;
+///
+/// SeventhQuality : 'Maj'
+///                ;
+///
+/// ExtendedInterval : '7' | '9' | '11' | '13'
+///                  ;
+///
+/// ChordStandard : ThirdQuality? (SeventhQuality ExtendedInterval)?
+///               ;
+/// ```
+fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
     where I: Stream<Item=char>
 {
-    let root = parser(note);
-
     let third =
         optional(token('m'))
             .map(|q| match q {
@@ -80,6 +107,31 @@ fn chord<I>(input: I) -> ParseResult<Chord, I>
                 None => ChordStructure::new()
             });
 
+    (third, extended)
+        .map(|(third, extended)| {
+            ChordStructure::new()
+                .insert(third)
+                .insert((PitchClass::N5, 0))
+                .merge(&extended)
+        })
+        .parse_stream(input)
+}
+
+/// Parses a set of chord alterations that may appear at the end of a chord.
+///
+/// An example of a set of alterations is final enclosed group in the
+/// chord, `C7(#5,b9)`.
+///
+/// ```text
+/// Alteration : [b#] ('5' | '9' | '11' | '13')
+///            ;
+///
+/// Alterations : '(' (Alteration ',')* ')'
+///             ;
+/// ```
+fn chord_alterations<I>(input: I) -> ParseResult<ChordStructure, I>
+    where I: Stream<Item=char>
+{
     let altered_interval =
         choice([
             try(string("5")), try(string("9")),
@@ -109,23 +161,32 @@ fn chord<I>(input: I) -> ParseResult<Chord, I>
         (optional(spaces()), token(','), optional(spaces()))
             .map(|_| |l: ChordStructure, r: ChordStructure| l.merge(&r));
 
-    let alterations =
-        optional(between(token('(').and(optional(spaces())), token(')'),
-            chainl1(alteration, chain_op)
-        ))
-        .map(|q| match q {
-            Some(inner) => inner,
-            None => ChordStructure::new()
-        });
 
-    (root, third, extended, alterations)
-        .map(|(root, third, extended, alterations)| {
+    optional(between(token('(').and(optional(spaces())), token(')'),
+        chainl1(alteration, chain_op)
+    ))
+    .map(|q| match q {
+        Some(inner) => inner,
+        None => ChordStructure::new()
+    })
+    .parse_stream(input)
+}
+
+/// Recognizes an entire chord of any type.
+///
+/// This does not currently handle special chord types such as `Adim` or `G+`
+/// and will accept only standard extended chord types.
+///
+/// See `chord_standard` for details.
+fn chord<I>(input: I) -> ParseResult<Chord, I>
+    where I: Stream<Item=char>
+{
+    (parser(note), parser(chord_standard), parser(chord_alterations))
+        .map(|(root, standard, alterations)| {
             Chord::new(
                 root,
                 ChordStructure::new()
-                    .insert(third)
-                    .insert((PitchClass::N5, 0))
-                    .merge(&extended)
+                    .merge(&standard)
                     .merge(&alterations)
             )
         })
