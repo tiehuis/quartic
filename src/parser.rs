@@ -11,6 +11,24 @@ use combine::{Stream, ParseResult, Parser};
 use combine::{between, choice, parser, many, one_of, optional, token, try, chainl1};
 use combine::char::{string, spaces};
 
+/// Parses a single accidental.
+///
+/// ```text
+/// Accidental : 'b' '#' '♭' '♯'
+///            ;
+/// ```
+fn accidental<I>(input: I) -> ParseResult<PitchOffset, I>
+    where I: Stream<Item=char>
+{
+    one_of("b#♭♯".chars())
+        .map(|x| match x {
+            '#' | '♯' =>  1,
+            'b' | '♭' => -1,
+            _ => unreachable!()
+        })
+        .parse_stream(input)
+}
+
 /// Parses a root note plus its accidentals.
 ///
 /// An example of a note is `A#bb`. Note that accidentals are reduced as much
@@ -30,15 +48,9 @@ fn note<I>(input: I) -> ParseResult<Note, I>
 
     // TODO: This could be more efficient with an iterator.
     let offset =
-        many(one_of("b#".chars()))
-            .map(|x: Vec<_>| {
-                x.iter().fold(0, |acc, x| match *x {
-                    '#' => acc + 1,
-                    'b' => acc - 1,
-                     _  => acc
-                })
-            })
-            .expected("Accidental: [b#]*");
+        many(parser(accidental))
+            .map(|x: Vec<_>| x.iter().sum())
+            .expected("Accidental: [b#♭♯]*");
 
     (root_note, offset)
         .map(|(root, offset)| Note::new(root.unwrap(), offset))
@@ -69,16 +81,24 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
     where I: Stream<Item=char>
 {
     let third =
-        optional(token('m'))
+        optional(choice([
+                try(string("min")), try(string("m")), try(string("-"))
+            ]))
             .map(|q| match q {
                 Some(_) => (PitchClass::N3, -1),
                 None => (PitchClass::N3, 0)
             });
 
     let seventh =
-        optional(choice([string("Maj")]))
+        optional(choice([
+                try(string("Maj")), try(string("Ma")),
+                try(string("M")), try(string("Δ"))
+            ]))
             .map(|q| match q {
-                Some("Maj") => (PitchClass::N7, 1),
+                Some("Maj") | Some("Ma") | Some("M") | Some("Δ") => {
+                    (PitchClass::N7, 1)
+                }
+
                 _ => (PitchClass::N7, 0)
             });
 
@@ -134,24 +154,20 @@ fn chord_alterations<I>(input: I) -> ParseResult<ChordStructure, I>
 {
     let altered_interval =
         choice([
-            try(string("5")), try(string("9")),
+            try(string("5")), try(string("6")), try(string("9")),
             try(string("11")), try(string("13"))
         ])
         .map(|q| match q {
+            "4"  => PitchClass::N4,
             "5"  => PitchClass::N5,
+            "6"  => PitchClass::N6,
             "9"  => PitchClass::N9,
             "11" => PitchClass::N11,
             "13" => PitchClass::N13,
             _ => unreachable!()
         });
 
-    let altered_offset =
-        one_of("b#".chars())
-            .map(|o| match o {
-                'b' => -1,
-                '#' =>  1,
-                _ => unreachable!()
-            });
+    let altered_offset = parser(accidental);
 
     let alteration =
         altered_offset.and(altered_interval)
@@ -160,7 +176,6 @@ fn chord_alterations<I>(input: I) -> ParseResult<ChordStructure, I>
     let chain_op =
         (optional(spaces()), token(','), optional(spaces()))
             .map(|_| |l: ChordStructure, r: ChordStructure| l.merge(&r));
-
 
     optional(between(token('(').and(optional(spaces())), token(')'),
         chainl1(alteration, chain_op)
@@ -211,6 +226,15 @@ mod tests {
 
         let result = parser(note).parse("G");
         assert_eq!(result, Ok((Note::new(G, 0), "")));
+    }
+
+    #[test]
+    fn parse_note_unicode_accidentals() {
+        let result = parser(note).parse("A♯#");
+        assert_eq!(result, Ok((Note::new(A, 2), "")));
+
+        let result = parser(note).parse("G♭");
+        assert_eq!(result, Ok((Note::new(G, -1), "")));
     }
 
     #[test]
@@ -273,6 +297,9 @@ mod tests {
                 .insert_many(&[(N3, 0), (N5, 0), (N7, 1), (N9, 0)])
         );
 
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("A#Δ9");
         assert_eq!(result, Ok((expected, "")));
     }
 

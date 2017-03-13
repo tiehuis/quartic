@@ -103,7 +103,7 @@ impl PitchClass {
 pub type PitchOffset = i8;
 
 /// A single note which may have applied accidentals.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Note {
     /// The base note
     pub root: NoteClass,
@@ -128,7 +128,7 @@ pub type ChordComponent = (PitchClass, PitchOffset);
 /// Represents the intervallic structure of a chord.
 ///
 /// This is relative to a root note so a transposition is very cheap.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ChordStructure([Option<PitchOffset>; PITCH_CLASS_COUNT]);
 
 impl ChordStructure {
@@ -188,7 +188,7 @@ impl ChordStructure {
 /// A single simple chord comprised of many notes.
 ///
 /// The chord representation used internally is based on tertian harmony.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Chord {
     /// The base note
     pub root: Note,
