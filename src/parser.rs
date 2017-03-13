@@ -35,7 +35,7 @@ fn accidental<I>(input: I) -> ParseResult<PitchOffset, I>
 /// as they can be **without** changing the base note given.
 ///
 /// ```text
-/// Note : [A-G][b#]*
+/// Note : [A-G] Accidental*
 ///      ;
 /// ```
 fn note<I>(input: I) -> ParseResult<Note, I>
@@ -65,10 +65,10 @@ fn note<I>(input: I) -> ParseResult<Note, I>
 /// An example of a chord this parser reconizes is `F#mMaj7`.
 ///
 /// ```text
-/// ThirdQuality : 'm'
+/// ThirdQuality : 'min' | 'm' | '-' | 'dim' | '°' | 'aug' | '+'
 ///              ;
 ///
-/// SeventhQuality : 'Maj'
+/// SeventhQuality : 'Maj' | 'Ma' | 'M' | 'Δ'
 ///                ;
 ///
 /// ExtendedInterval : '7' | '9' | '11' | '13'
@@ -82,11 +82,32 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
 {
     let third =
         optional(choice([
-                try(string("min")), try(string("m")), try(string("-"))
+                try(string("min")), try(string("m")), try(string("-")),
+                try(string("dim")), try(string("°")),
+                try(string("aug")), try(string("+"))
             ]))
             .map(|q| match q {
-                Some(_) => (PitchClass::N3, -1),
-                None => (PitchClass::N3, 0)
+                Some("min") | Some("m") | Some("-") => {
+                    ChordStructure::from_component((PitchClass::N3, -1))
+                        .insert((PitchClass::N5, 0))
+                }
+
+                Some("dim") | Some("°") => {
+                    ChordStructure::from_component((PitchClass::N3, -1))
+                        .insert((PitchClass::N5, -1))
+                }
+
+                Some("aug") | Some("+") => {
+                    ChordStructure::from_component((PitchClass::N3, 0))
+                        .insert((PitchClass::N5, 1))
+                }
+
+                Some(_) => unreachable!(),
+
+                None => {
+                    ChordStructure::from_component((PitchClass::N3, 0))
+                        .insert((PitchClass::N5, 0))
+                }
             });
 
     let seventh =
@@ -130,8 +151,7 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
     (third, extended)
         .map(|(third, extended)| {
             ChordStructure::new()
-                .insert(third)
-                .insert((PitchClass::N5, 0))
+                .merge(&third)
                 .merge(&extended)
         })
         .parse_stream(input)
@@ -143,7 +163,7 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
 /// chord, `C7(#5,b9)`.
 ///
 /// ```text
-/// Alteration : [b#] ('5' | '9' | '11' | '13')
+/// Alteration : Accidental ('4' | '5' | '6' | '9' | '11' | '13')
 ///            ;
 ///
 /// Alterations : '(' (Alteration ',')* ')'
@@ -370,6 +390,48 @@ mod tests {
             Note::new(C, 0),
             ChordStructure::new()
                 .insert_many(&[(N3, 0), (N5, -1), (N7, 1), (N9, 0), (N11, 1)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_augmented_triad() {
+        let result = parser(chord).parse("C+");
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 1)])
+        );
+
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("Caug");
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_diminished_triad() {
+        let result = parser(chord).parse("Cdim");
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, -1)])
+        );
+
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("C°");
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_augmented_extended() {
+        let result = parser(chord).parse("C+7(#9)");
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 1), (N7, 0), (N9, 1)])
         );
 
         assert_eq!(result, Ok((expected, "")));
