@@ -83,23 +83,11 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
     let third =
         optional(choice([
                 try(string("min")), try(string("m")), try(string("-")),
-                try(string("dim")), try(string("°")),
-                try(string("aug")), try(string("+"))
             ]))
             .map(|q| match q {
                 Some("min") | Some("m") | Some("-") => {
                     ChordStructure::from_component((PitchClass::N3, -1))
                         .insert((PitchClass::N5, 0))
-                }
-
-                Some("dim") | Some("°") => {
-                    ChordStructure::from_component((PitchClass::N3, -1))
-                        .insert((PitchClass::N5, -1))
-                }
-
-                Some("aug") | Some("+") => {
-                    ChordStructure::from_component((PitchClass::N3, 0))
-                        .insert((PitchClass::N5, 1))
                 }
 
                 Some(_) => unreachable!(),
@@ -157,26 +145,80 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
         .parse_stream(input)
 }
 
+/// Parses an augmented or diminished chord including its direct extensions
+/// (i.e. `Adim7`).
+///
+/// ```text
+/// ExtendedQuality : '7'
+///                 ;
+///
+/// Diminished : 'dim' | '°'
+///            ;
+///
+/// Augmented : 'aug' | '+'
+///           ;
+///
+/// ChordAugDim : (Augmented | Diminished) ExtendedQuality?
+///             ;
+/// ```
+fn chord_aug_or_dim<I>(input: I) -> ParseResult<ChordStructure, I>
+    where I: Stream<Item=char>
+{
+    let mut aug_dim =
+        choice([
+            try(string("dim")), try(string("°")),
+            try(string("aug")), try(string("+"))
+        ])
+        .and(optional(token('7')))
+        .map(|(q, e)| match q {
+            "dim" | "°" => {
+                let m = ChordStructure::from_component((PitchClass::N3, -1))
+                            .insert((PitchClass::N5, -1));
+
+                if e.is_some() {
+                    m.insert((PitchClass::N7, -1))
+                } else {
+                    m
+                }
+            }
+
+            "aug" | "+" => {
+                let m = ChordStructure::from_component((PitchClass::N3, 0))
+                            .insert((PitchClass::N5, 1));
+
+                if e.is_some() {
+                    m.insert((PitchClass::N7, 0))
+                } else {
+                    m
+                }
+            }
+
+            _ => unreachable!(),
+        });
+
+    aug_dim.parse_stream(input)
+}
+
 /// Parses special chords which do not use standard thirds/sevenths.
 ///
 /// An example of a chord this parser reconizes is `F5`.
 ///
 /// ```text
-/// ThirdQuality : '5'
-///              ;
+/// FifthChord : '5'
+///            ;
 ///
-/// ChordSpecial : SpecialQuality
+/// ChordSpecial : FifthChord | ChordAugDim
 ///              ;
 /// ```
 fn chord_special<I>(input: I) -> ParseResult<ChordStructure, I>
     where I: Stream<Item=char>
 {
-    let mut fifth =
+    let chord_fifth =
         token('5')
             .map(|_| ChordStructure::new().insert((PitchClass::N5, 0)))
             .expected("Chord: 5");
 
-    fifth.parse_stream(input)
+    chord_fifth.or(parser(chord_aug_or_dim)).parse_stream(input)
 }
 
 /// Parses a set of chord alterations that may appear at the end of a chord.
@@ -446,6 +488,21 @@ mod tests {
         assert_eq!(result, Ok((expected.clone(), "")));
 
         let result = parser(chord).parse("C°");
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_diminished_triad_extended() {
+        let result = parser(chord).parse("Bbdim7");
+        let expected = Chord::new(
+            Note::new(B, -1),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, -1), (N7, -1)])
+        );
+
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("Bb°7");
         assert_eq!(result, Ok((expected, "")));
     }
 
