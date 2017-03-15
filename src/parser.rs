@@ -157,6 +157,28 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
         .parse_stream(input)
 }
 
+/// Parses special chords which do not use standard thirds/sevenths.
+///
+/// An example of a chord this parser reconizes is `F5`.
+///
+/// ```text
+/// ThirdQuality : '5'
+///              ;
+///
+/// ChordSpecial : SpecialQuality
+///              ;
+/// ```
+fn chord_special<I>(input: I) -> ParseResult<ChordStructure, I>
+    where I: Stream<Item=char>
+{
+    let mut fifth =
+        token('5')
+            .map(|_| ChordStructure::new().insert((PitchClass::N5, 0)))
+            .expected("Chord: 5");
+
+    fifth.parse_stream(input)
+}
+
 /// Parses a set of chord alterations that may appear at the end of a chord.
 ///
 /// An example of a set of alterations is final enclosed group in the
@@ -216,7 +238,9 @@ fn chord_alterations<I>(input: I) -> ParseResult<ChordStructure, I>
 fn chord<I>(input: I) -> ParseResult<Chord, I>
     where I: Stream<Item=char>
 {
-    (parser(note), parser(chord_standard), parser(chord_alterations))
+    let chord = try(parser(chord_special)).or(try(parser(chord_standard)));
+
+    (parser(note), chord, parser(chord_alterations))
         .map(|(root, standard, alterations)| {
             Chord::new(
                 root,
@@ -432,6 +456,18 @@ mod tests {
             Note::new(C, 0),
             ChordStructure::new()
                 .insert_many(&[(N3, 0), (N5, 1), (N7, 0), (N9, 1)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_fifth_chord() {
+        let result = parser(chord).parse("D5");
+        let expected = Chord::new(
+            Note::new(D, 0),
+            ChordStructure::new()
+                .insert_many(&[(N5, 0)])
         );
 
         assert_eq!(result, Ok((expected, "")));
