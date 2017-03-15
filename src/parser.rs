@@ -14,16 +14,20 @@ use combine::char::{string, spaces};
 /// Parses a single accidental.
 ///
 /// ```text
-/// Accidental : 'b' '#' '♭' '♯'
+/// Accidental : 'b' | '#' | '♭' | '♯' | '𝄪'
 ///            ;
 /// ```
+///
+/// Note: The last symbol present is the double-sharp. Since it is quite
+/// uncommon it may not be rendered correctly with many fonts.
 fn accidental<I>(input: I) -> ParseResult<PitchOffset, I>
     where I: Stream<Item=char>
 {
-    one_of("b#♭♯".chars())
+    one_of("b#♭♯𝄪".chars())
         .map(|x| match x {
             '#' | '♯' =>  1,
             'b' | '♭' => -1,
+            '𝄪'       =>  2,
             _ => unreachable!()
         })
         .parse_stream(input)
@@ -321,6 +325,12 @@ mod tests {
 
         let result = parser(note).parse("G♭");
         assert_eq!(result, Ok((Note::new(G, -1), "")));
+    }
+
+    #[test]
+    fn parse_note_unicode_accidentals_double_sharp() {
+        let result = parser(note).parse("F♯𝄪b");
+        assert_eq!(result, Ok((Note::new(F, 2), "")));
     }
 
     #[test]
