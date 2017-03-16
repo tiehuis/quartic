@@ -69,7 +69,7 @@ fn note<I>(input: I) -> ParseResult<Note, I>
 /// An example of a chord this parser reconizes is `F#mMaj7`.
 ///
 /// ```text
-/// ThirdQuality : 'min' | 'm' | '-' | 'dim' | '°' | 'aug' | '+'
+/// ThirdQuality : 'min' | 'mi' | 'm' | '-'
 ///              ;
 ///
 /// SeventhQuality : 'Maj' | 'Ma' | 'M' | 'Δ'
@@ -86,10 +86,11 @@ fn chord_standard<I>(input: I) -> ParseResult<ChordStructure, I>
 {
     let third =
         optional(choice([
-                try(string("min")), try(string("m")), try(string("-")),
+                try(string("min")), try(string("mi")),
+                try(string("m")), try(string("-")),
             ]))
             .map(|q| match q {
-                Some("min") | Some("m") | Some("-") => {
+                Some("min") | Some("mi") | Some("m") | Some("-") => {
                     ChordStructure::from_component((PitchClass::N3, -1))
                         .insert((PitchClass::N5, 0))
                 }
@@ -381,6 +382,15 @@ mod tests {
                 .insert_many(&[(N3, -1), (N5, 0)])
         );
 
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("A#min");
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("A#mi");
+        assert_eq!(result, Ok((expected.clone(), "")));
+
+        let result = parser(chord).parse("A#-");
         assert_eq!(result, Ok((expected, "")));
     }
 
