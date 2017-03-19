@@ -276,27 +276,49 @@ fn chord_alterations<I>(input: I) -> ParseResult<ChordStructure, I>
     .parse_stream(input)
 }
 
+/// Parse a trailing slash chord extension.
+///
+/// And example of a slash extension this parses is `/A#`.
+///
+/// ```text
+/// SlashExtension : '/' Note
+///                ;
+/// ```
+fn slash_extension<I>(input: I) -> ParseResult<Note, I>
+    where I: Stream<Item=char>
+{
+    (token('/'), parser(note))
+        .map(|(_, note)| note)
+        .parse_stream(input)
+}
+
 /// Recognizes an entire chord of any type.
 ///
-/// This does not currently handle special chord types such as `Adim` or `G+`
-/// and will accept only standard extended chord types.
-///
-/// See `chord_standard` for details.
+/// ```text
+/// Chord : Note (ChordSpecial | ChordStandard) ChordAlterations SlashExtension?
+///       ;
+/// ```
 fn chord<I>(input: I) -> ParseResult<Chord, I>
     where I: Stream<Item=char>
 {
     let chord = try(parser(chord_special)).or(try(parser(chord_standard)));
 
-    (parser(note), chord, parser(chord_alterations))
-        .map(|(root, standard, alterations)| {
-            Chord::new(
-                root,
-                ChordStructure::new()
-                    .merge(&standard)
-                    .merge(&alterations)
-            )
-        })
-        .parse_stream(input)
+    (
+        parser(note),
+        chord,
+        parser(chord_alterations),
+        optional(parser(slash_extension))
+    )
+    .map(|(root, standard, alterations, slash)| {
+        Chord {
+            slash_root: slash,
+            root: root,
+            structure: ChordStructure::new()
+                            .merge(&standard)
+                            .merge(&alterations)
+        }
+    })
+    .parse_stream(input)
 }
 
 #[cfg(test)]
@@ -545,6 +567,32 @@ mod tests {
             Note::new(D, 0),
             ChordStructure::new()
                 .insert_many(&[(N5, 0)])
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_slash_chord_simple() {
+        let result = parser(chord).parse("A/C#");
+        let expected = Chord::new_slash(
+            Note::new(C, 1),
+            Note::new(A, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)]),
+        );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_slash_chord_extended() {
+        let result = parser(chord).parse("AMaj7(#5,#11)/C#");
+        let expected = Chord::new_slash(
+            Note::new(C, 1),
+            Note::new(A, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 1), (N7, 1), (N11, 1)]),
         );
 
         assert_eq!(result, Ok((expected, "")));

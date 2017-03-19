@@ -190,6 +190,9 @@ impl ChordStructure {
 /// The chord representation used internally is based on tertian harmony.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Chord {
+    /// Slash chord base note
+    pub slash_root: Option<Note>,
+
     /// The base note
     pub root: Note,
 
@@ -200,6 +203,13 @@ pub struct Chord {
 impl Chord {
     /// Construct and return a new `Chord`.
     pub fn new(root: Note, structure: ChordStructure) -> Chord {
-        Chord { root, structure }
+        Chord { slash_root: None, root, structure }
+    }
+
+    /// Construct and return a new slash-chord.
+    pub fn new_slash(slash_root: Note, root: Note, structure: ChordStructure)
+        -> Chord
+    {
+        Chord { slash_root: Some(slash_root), root, structure }
     }
 }
