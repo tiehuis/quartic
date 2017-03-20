@@ -213,3 +213,21 @@ impl Chord {
         Chord { slash_root: Some(slash_root), root, structure }
     }
 }
+
+/// A single polychord which is comprised of an upper chord stacked atop a
+/// lower chord.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PolyChord {
+    /// Upper chord structure
+    upper: Chord,
+
+    /// Lower chord structure
+    lower: Chord
+}
+
+impl PolyChord {
+    /// Construct and return a new `PolyChord`.
+    pub fn new(upper: Chord, lower: Chord) -> PolyChord {
+        PolyChord { upper, lower }
+    }
+}

@@ -321,6 +321,24 @@ fn chord<I>(input: I) -> ParseResult<Chord, I>
     .parse_stream(input)
 }
 
+/// Recognizes a polychord.
+///
+/// ```text
+/// PolyChord : Chord '|' Chord
+///           ;
+/// ```
+fn polychord<I>(input: I) -> ParseResult<PolyChord, I>
+    where I: Stream<Item=char>
+{
+    (
+        parser(chord).skip(spaces()),
+        token('|').skip(spaces()),
+        parser(chord)
+    )
+    .map(|(upper, _, lower)| PolyChord::new(upper, lower))
+    .parse_stream(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,6 +612,71 @@ mod tests {
             ChordStructure::new()
                 .insert_many(&[(N3, 0), (N5, 1), (N7, 1), (N11, 1)]),
         );
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_simple_polychord() {
+        let result = parser(polychord).parse("F|Cb");
+
+        let upper = Chord::new(
+            Note::new(F, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        let lower = Chord::new(
+            Note::new(C, -1),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        let expected = PolyChord::new(upper, lower);
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_complex_polychord() {
+        let result = parser(polychord).parse("F#Maj13(#5,b9)|G#m");
+
+        let upper = Chord::new(
+            Note::new(F, 1),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 1), (N7, 1), (N9, -1), (N11, 0), (N13, 0)])
+        );
+
+        let lower = Chord::new(
+            Note::new(G, 1),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, 0)])
+        );
+
+        let expected = PolyChord::new(upper, lower);
+
+        assert_eq!(result, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_slash_polychord() {
+        let result = parser(polychord).parse("A/C#|Gm/Bb");
+
+        let upper = Chord::new_slash(
+            Note::new(C, 1),
+            Note::new(A, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        let lower = Chord::new_slash(
+            Note::new(B, -1),
+            Note::new(G, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, 0)])
+        );
+
+        let expected = PolyChord::new(upper, lower);
 
         assert_eq!(result, Ok((expected, "")));
     }
