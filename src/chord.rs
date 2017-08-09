@@ -24,6 +24,8 @@
 //!
 //! All `Chord`'s have an implicit root pitch class.
 
+use std::fmt::{self, Write};
+
 /// A single note without accidentals.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum NoteClass {
@@ -95,6 +97,12 @@ impl NoteClass {
     }
 }
 
+impl fmt::Display for NoteClass {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 /// Relative pitch compared to some base note as part of a chord.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PitchClass {
@@ -105,6 +113,25 @@ pub enum PitchClass {
 pub const PITCH_CLASS_COUNT: usize = 10;
 
 impl PitchClass {
+    /// Construct a pitch-class from an index.
+    pub fn from_int(input: usize) -> Option<Self> {
+        use self::PitchClass::*;
+
+        match input {
+            0 => Some(N1),
+            1 => Some(N2),
+            2 => Some(N3),
+            3 => Some(N4),
+            4 => Some(N5),
+            5 => Some(N6),
+            6 => Some(N7),
+            7 => Some(N9),
+            8 => Some(N11),
+            9 => Some(N13),
+            _ => None,
+        }
+    }
+
     /// Allows `PitchClass` to be used as an indexable element.
     pub fn index(&self) -> usize {
         use self::PitchClass::*;
@@ -219,6 +246,18 @@ impl Note {
     }
 }
 
+impl fmt::Display for Note {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.root)?;
+        let accidental = if self.offset.is_positive() { '#' } else { 'b' };
+        for _ in 0..self.offset.abs() {
+            f.write_char(accidental)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// A relative note within a chord by its intervallic representation.
 ///
 /// For example, a (PitchClass::n7, 1) would represent a sharpened seventh,
@@ -312,6 +351,75 @@ impl Chord {
     {
         Chord { slash_root: Some(slash_root), root, structure }
     }
+
+    /// Return an iterator over each of all notes this chord is comprised of.
+    ///
+    /// Notes are returned from lowest pitch to highest, in order.
+    pub fn iter(&self) -> NoteIterator {
+        NoteIterator {
+            chord: self,
+            state: NoteIteratorState::Slash,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NoteIterator<'a> {
+    chord: &'a Chord,
+    state: NoteIteratorState,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum NoteIteratorState {
+    Slash,
+    Structure(usize),
+    Exhausted,
+}
+
+impl<'a> Iterator for NoteIterator<'a> {
+    type Item = Note;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use self::NoteIteratorState::*;
+
+        'retry: loop {
+            return match self.state {
+                Slash => {
+                    self.state = Structure(0);
+
+                    if let Some(note) = self.chord.slash_root {
+                        Some(note)
+                    } else {
+                        continue 'retry;
+                    }
+                },
+
+                Structure(ii) => {
+                    let mut i = ii;
+
+                    while i < PITCH_CLASS_COUNT {
+                        if let Some(offset) = self.chord.structure.0[i] {
+                            let pc = PitchClass::from_int(i).unwrap();
+
+                            // Next time around we need to be looking at the
+                            // next element from the beginning.
+                            self.state = Structure(i + 1);
+                            return Some(self.chord.root.get_relative((pc, offset)));
+                        }
+
+                        i += 1;
+                    }
+
+                    self.state = Exhausted;
+                    None
+                },
+
+                Exhausted => {
+                    None
+                },
+            };
+        }
+    }
 }
 
 /// A single polychord which is comprised of an upper chord stacked atop a
@@ -346,5 +454,24 @@ mod tests {
         assert_eq!(Note::new(F, -1).get_relative((N2, -2)), Note::new(G, -3));
         assert_eq!(Note::new(D, 0).get_relative((N3, 0)), Note::new(F, 1));
         assert_eq!(Note::new(A, 0).get_relative((N3, 0)), Note::new(C, 1));
+    }
+
+    #[test]
+    fn chord_notes() {
+        let chord = Chord::new_slash(
+            Note::new(C, 1),
+            Note::new(A, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        let notes = vec![
+            Note::new(C, 1),
+            Note::new(A, 0),
+            Note::new(C, 1),
+            Note::new(E, 0),
+        ];
+
+        assert_eq!(chord.iter().collect::<Vec<_>>(), notes);
     }
 }
