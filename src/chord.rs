@@ -27,6 +27,12 @@
 use std::fmt::{self, Write};
 use std::iter;
 
+use combine::Parser;
+use parser::{parse_chord, parse_polychord};
+
+pub use combine::ParseError;
+pub type ParseResult<'a, T> = Result<T, ParseError<&'a str>>;
+
 /// A single note without accidentals.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum NoteClass {
@@ -353,6 +359,11 @@ impl Chord {
         Chord { slash_root: Some(slash_root), root, structure }
     }
 
+    /// Construct a chord from a shorthand string.
+    pub fn from_str(input: &str) -> ParseResult<Chord> {
+        parse_chord().parse(input).map(|c| c.0)
+    }
+
     /// Return an iterator over each of all notes this chord is comprised of.
     ///
     /// Notes are returned from lowest pitch to highest, in order.
@@ -440,6 +451,11 @@ impl PolyChord {
         PolyChord { upper, lower }
     }
 
+    /// Construct a chord from a shorthand string.
+    pub fn from_str(input: &str) -> ParseResult<PolyChord> {
+        parse_polychord().parse(input).map(|c| c.0)
+    }
+
     /// Return an iterator over each of all notes this chord is comprised of.
     ///
     /// Notes are returned from lowest pitch to highest, in order.
@@ -510,5 +526,38 @@ mod tests {
         ];
 
         assert_eq!(chord.iter().collect::<Vec<_>>(), notes);
+    }
+
+    #[test]
+    fn chord_from_str() {
+        let chord = Chord::from_str("C").unwrap();
+
+        let expected = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        assert_eq!(chord, expected);
+    }
+
+    #[test]
+    fn polychord_from_str() {
+        let chord = PolyChord::from_str("C|Am").unwrap();
+
+        let upper = Chord::new(
+            Note::new(C, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, 0), (N5, 0)])
+        );
+
+        let lower = Chord::new(
+            Note::new(A, 0),
+            ChordStructure::new()
+                .insert_many(&[(N3, -1), (N5, 0)])
+        );
+
+        let expected = PolyChord::new(upper, lower);
+        assert_eq!(chord, expected);
     }
 }

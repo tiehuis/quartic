@@ -8,8 +8,24 @@
 use chord::*;
 
 use combine::{Stream, ParseResult, Parser};
-use combine::{between, choice, parser, many, one_of, optional, token, try, chainl1};
+use combine::{eof, between, choice, parser, many, one_of, optional, token, try, chainl1};
 use combine::char::{string, spaces};
+
+parser! {
+    pub fn parse_chord[I]()(I) -> Chord
+        where [I: Stream<Item=char>]
+    {
+        parser(chord).skip(eof())
+    }
+}
+
+parser! {
+    pub fn parse_polychord[I]()(I) -> PolyChord
+        where [I: Stream<Item=char>]
+    {
+        parser(polychord).skip(eof())
+    }
+}
 
 /// Parses a single accidental.
 ///
