@@ -25,6 +25,7 @@
 //! All `Chord`'s have an implicit root pitch class.
 
 use std::fmt::{self, Write};
+use std::iter;
 
 /// A single note without accidentals.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -234,7 +235,7 @@ impl Note {
 
     /// Return the relative `Note` based on the given pitch-class.
     pub fn get_relative(&self, (class, offset): ChordComponent) -> Note {
-        let root_val = (self.root.to_int() + class.to_int()) % PITCH_CLASS_COUNT;
+        let root_val = (self.root.to_int() + class.to_int()) % NOTE_CLASS_COUNT;
         let root_note = NoteClass::from_int(root_val).unwrap();
         let rel_offset = class.to_relative_difference() as i8
                          - self.root.difference(&root_note) as i8;
@@ -438,6 +439,13 @@ impl PolyChord {
     pub fn new(upper: Chord, lower: Chord) -> PolyChord {
         PolyChord { upper, lower }
     }
+
+    /// Return an iterator over each of all notes this chord is comprised of.
+    ///
+    /// Notes are returned from lowest pitch to highest, in order.
+    pub fn iter(&self) -> iter::Chain<NoteIterator, NoteIterator> {
+        self.lower.iter().chain(self.upper.iter())
+    }
 }
 
 #[cfg(test)]
@@ -458,6 +466,7 @@ mod tests {
 
     #[test]
     fn chord_notes() {
+        // A/C#
         let chord = Chord::new_slash(
             Note::new(C, 1),
             Note::new(A, 0),
@@ -470,6 +479,34 @@ mod tests {
             Note::new(A, 0),
             Note::new(C, 1),
             Note::new(E, 0),
+        ];
+
+        assert_eq!(chord.iter().collect::<Vec<_>>(), notes);
+    }
+
+    #[test]
+    fn polychord_notes() {
+        // F#(#5)|Bm
+        let chord = PolyChord::new(
+            Chord::new(
+                Note::new(F, 1),
+                ChordStructure::new()
+                    .insert_many(&[(N3, 0), (N5, 1)])
+            ),
+            Chord::new(
+                Note::new(B, 0),
+                ChordStructure::new()
+                    .insert_many(&[(N3, -1), (N5, 0)])
+            )
+        );
+
+        let notes = vec![
+            Note::new(B, 0),
+            Note::new(D, 0),
+            Note::new(F, 1),
+            Note::new(F, 1),
+            Note::new(A, 1),
+            Note::new(C, 2),
         ];
 
         assert_eq!(chord.iter().collect::<Vec<_>>(), notes);
