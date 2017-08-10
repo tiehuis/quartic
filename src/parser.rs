@@ -1,9 +1,7 @@
 //! Handles parsing of various free-form inputs.
-//
-// TODO: Needs to be determined how we want to handle errors here. Likely start
-// by just re-exporting those from `combine`.
 
 #![allow(dead_code)]
+#![cfg_attr(feature="cargo-clippy", allow(unneeded_field_pattern))]
 
 use chord::*;
 

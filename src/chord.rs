@@ -6,7 +6,7 @@
 //! ```
 //! use quartic::chord::{Chord, ChordStructure, Note, NoteClass, PitchClass};
 //!
-//! /// Manual construction of a A#Maj13(#5)(#11)
+//! // Manual construction of a A#Maj13(#5)(#11)
 //! let root = Note::new(NoteClass::A, 1);
 //! let structure =
 //!     ChordStructure::new()
@@ -19,7 +19,10 @@
 //!             (PitchClass::N13, 0),
 //!         ]);
 //!
-//! let a = Chord::new(root, structure);
+//! let chord1 = Chord::new(root, structure);
+//!
+//! // Shorthand construction
+//! let chord2 = Chord::from_shorthand("A#Maj13(#5,#11)").unwrap();
 //! ```
 //!
 //! All `Chord`'s have an implicit root pitch class.
@@ -30,7 +33,10 @@ use std::iter;
 use combine::Parser;
 use parser::{parse_chord, parse_polychord};
 
+/// Represents an error which may occur when parsing shorthand chord forms.
 pub use combine::ParseError;
+
+/// Represents a result returned by values which perform parsing.
 pub type ParseResult<'a, T> = Result<T, ParseError<&'a str>>;
 
 /// A single note without accidentals.
@@ -163,16 +169,13 @@ impl PitchClass {
         use self::PitchClass::*;
 
         match *self {
-            N1  => 0,
-            N2  => 1,
-            N3  => 2,
-            N4  => 3,
-            N5  => 4,
-            N6  => 5,
-            N7  => 6,
-            N9  => 1,
-            N11 => 3,
-            N13 => 5,
+            N1       => 0,
+            N2 | N9  => 1,
+            N3       => 2,
+            N4 | N11 => 3,
+            N5       => 4,
+            N6 | N13 => 5,
+            N7       => 6,
         }
     }
 
@@ -267,14 +270,14 @@ impl fmt::Display for Note {
 
 /// A relative note within a chord by its intervallic representation.
 ///
-/// For example, a (PitchClass::n7, 1) would represent a sharpened seventh,
+/// For example, a (`PitchClass::n7`, 1) would represent a sharpened seventh,
 /// as found in a major seventh chord.
 pub type ChordComponent = (PitchClass, PitchOffset);
 
 /// Represents the intervallic structure of a chord.
 ///
 /// This is relative to a root note so a transposition is very cheap.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ChordStructure([Option<PitchOffset>; PITCH_CLASS_COUNT]);
 
 impl ChordStructure {
@@ -360,7 +363,7 @@ impl Chord {
     }
 
     /// Construct a chord from a shorthand string.
-    pub fn from_str(input: &str) -> ParseResult<Chord> {
+    pub fn from_shorthand(input: &str) -> ParseResult<Chord> {
         parse_chord().parse(input).map(|c| c.0)
     }
 
@@ -375,9 +378,12 @@ impl Chord {
     }
 }
 
+/// An iterator over notes in a chord.
+///
+/// Notes are returned lowest to highest in pitch.
 #[derive(Clone, Debug)]
 pub struct NoteIterator<'a> {
-    chord: &'a Chord,
+    pub chord: &'a Chord,
     state: NoteIteratorState,
 }
 
@@ -439,10 +445,10 @@ impl<'a> Iterator for NoteIterator<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PolyChord {
     /// Upper chord structure
-    upper: Chord,
+    pub upper: Chord,
 
     /// Lower chord structure
-    lower: Chord
+    pub lower: Chord
 }
 
 impl PolyChord {
@@ -452,7 +458,7 @@ impl PolyChord {
     }
 
     /// Construct a chord from a shorthand string.
-    pub fn from_str(input: &str) -> ParseResult<PolyChord> {
+    pub fn from_shorthand(input: &str) -> ParseResult<PolyChord> {
         parse_polychord().parse(input).map(|c| c.0)
     }
 
@@ -529,8 +535,8 @@ mod tests {
     }
 
     #[test]
-    fn chord_from_str() {
-        let chord = Chord::from_str("C").unwrap();
+    fn chord_from_shorthand() {
+        let chord = Chord::from_shorthand("C").unwrap();
 
         let expected = Chord::new(
             Note::new(C, 0),
@@ -542,8 +548,8 @@ mod tests {
     }
 
     #[test]
-    fn polychord_from_str() {
-        let chord = PolyChord::from_str("C|Am").unwrap();
+    fn polychord_from_shorthand() {
+        let chord = PolyChord::from_shorthand("C|Am").unwrap();
 
         let upper = Chord::new(
             Note::new(C, 0),
