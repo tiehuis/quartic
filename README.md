@@ -1,7 +1,16 @@
+# quartic
+[![Build Status](https://travis-ci.org/tiehuis/quartic.svg?branch=master)](https://travis-ci.org/tiehuis/quartic)
+[![Docs](https://docs.rs/quartic/badge.svg)](https://docs.rs/quartic)
+[![Crate](https://img.shields.io/crates/v/quartic.svg)](https://crates.io/crates/quartic)
+
 A library for dealing with music theory fundamentals.
 
 Currently this only provides support for some chord representation and
 simplistic parsing.
+
+```
+quartic = "0.1.0"
+```
 
 ## Examples
 
