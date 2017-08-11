@@ -2,6 +2,11 @@
 name = "quartic"
 version = "0.1.0"
 authors = ["tiehuis <marctiehuis@gmail.com>"]
+license = "MIT/Apache-2.0"
+description = "Music theory primitives"
+repository = "https://github.com/tiehuis/quartic"
+readme = "README.md"
+keywords = ["chords", "notes", "music"]
 
 [dependencies]
 combine = "2.5.0"
